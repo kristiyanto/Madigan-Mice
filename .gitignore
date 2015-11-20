@@ -1,0 +1,12 @@
+OUTPUT/*
+LPS Study/*
+TABLEU/*
+PAPERS/*
+RAW DATA/*
+*.RData
+*.Rhistory
+*.csv
+*.CEL
+*.xls
+*.xlsx
+
