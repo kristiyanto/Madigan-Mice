@@ -7,33 +7,31 @@ output:
     fig_caption: yes
     theme: flatly
 ---
-```{r, echo=FALSE, results="hide", warning=FALSE, eval=TRUE, cache=TRUE}
- 
-# Setting environtment
-source("https://bioconductor.org/biocLite.R")
-library("limma")
+```{r, echo=FALSE, results="hide", warning=FALSE, include=FALSE, eval=TRUE}
+library("annotate")
+library("mogene21stprobeset.db")
 library("gplots")
 library("reshape2")
 library("RColorBrewer")
-library("oligo")
 library("fields")
+library("annotate")
+library("mogene21stprobeset.db")
+library("limma")
 working.dir <- "~/Google Drive/BIOINFORMATICS/Madigan"
 setwd(working.dir)
+load("tomarkdown.RData")
 
-#################################### PARAMETERS ######################################
-  load("tomarkdown.RData")
-  core.data.ann       <- merge(curr.diff, ann.data, by.x=0, by.y=0, all=T)
-
-  f.map = cbind(colnames(exprs(core.rma)),all.grp)
 ```
 
 # Introduction
-The experiment are conducted by Madigan Army Center, with 96 mice, for 8 groups. 
+The experiment are conducted by Madigan Army Center, with 96 mice, for 8 groups.
+The entire analisys is done in R on the probeset data (latter annotated).
+The scripts are available at http://github.com/kristiyanto
 
 ## Raw Data
 Here's the Raw data from the CEL files provided
 ```{r, echo=FALSE, cache=TRUE}
-  boxplot(core.cel, which=c("all"), transfo=identity, nsample=40000, main="Raw Data (Log2)")
+  boxplot(core.cel, which=c("all"), transfo=identity, nsample=40000, main="Raw Data")
   
   boxplot(core.cel, which=c("all"), transfo=log2, nsample=40000, main="Raw Data (Log2)")
 ```
@@ -46,7 +44,7 @@ Subsequent the reading, Normalization was applied. After few comparing some of t
   boxplot(core.qsp, which=c("all"), transfo=log2, nsample=40000, main="QSspline Normalized (Log2)")
 ```
 
-Once normalized, RMA was extracted with background correction. Here's the result
+Once normalized, RMA was extracted with background correction.
 ```{r, echo=FALSE, cache=TRUE}
  boxplot(core.rma, transfo=identity, nsample=40000, main="RMA")
 ```
@@ -54,25 +52,24 @@ Once normalized, RMA was extracted with background correction. Here's the result
 # Sanity Check
 Distribution of genes with prior knowlegde/asumptions.
 ```{r, echo=FALSE, eval=TRUE}
-  library("fields")
-
-  tmp = c(21898,21926,16193,16183,18823,18227)
-  tmp.c = c(brewer.pal(11,"Spectral"),"red")
-  
-  for(i in tmp)
-    bplot(curr.diff[which(core.data.ann$ENTREZ==i),], by=D, col=tmp.c, horizontal=FALSE, main=paste(core.data.ann[which(core.data.ann$ENTREZ==i),"SYMBOL"],"ENTREZ:",i))
-
+  for(i in known.genes)
+  {
+    mapping   <- select(mogene21stprobeset.db, as.character(i), c("PROBEID"), keytype="ENTREZID")
+    gene.name <- select(mogene21stprobeset.db, as.character(mapping$PROBEID), c("SYMBOL"))
+    gene.name <- levels(as.factor(gene.name$SYMBOL))
+    bplot(curr.diff[mapping$PROBEID,], by=D, col=colors.12p, horizontal=FALSE, main=paste(gene.name, "Entrez:",i))
+  }
 ```
 
 
 # Differential Gene Expression
-Differential Gene Expression was conducted using LIMMA. 
+Differential Gene Expression was conducted using LIMMA.
 Here's the the distribution of the P Value and the T statistic
 ```{r, echo=FALSE, cache=TRUE}
 
-    hist(fit2$F.p.value, main=paste("All. F. P Value"), freq=T, breaks=seq(0,1,p), xlab="PValue", col=brewer.pal(11,"Spectral"))
+    hist(fit2$F.p.value, main=paste("All. F. P Value"), freq=T, breaks=seq(0,1,p), xlab="PValue", col=colors.12)
     
-    hist(fit2$t, main=paste("T Statistic"), freq=T, breaks=seq(-10,10,p), xlab="TStatistic", col=brewer.pal(12, "Paired"))
+    hist(fit2$t, main=paste("T Statistic"), freq=T, breaks=seq(-10,10,p), xlab="TStatistic", col=colors.12p)
 
 ```
 
@@ -80,17 +77,19 @@ Here's the Top Genes that are differential expressed (Significance `r p`)
 
 ```{r, echo=FALSE, eval=TRUE}
     p = 0.05
+    results              <- decideTests(fit2,adjust.method="fdr",p.value=p)
     topTable(fit2,p.value=p, adjust="fdr")
-    summary(results)
     vennDiagram(results,include = "both", main=paste("Differentially Expressed. P=",p))
-    p = 0.01
+    summary(results)
 ```
 
-Narrowing down the P Value (Significance `r p`)
-
+## Narrowing down the P Value (Significance `r p=0.01` `r p`)
+Summary of DE Genes:
 ```{r, echo=FALSE, eval=TRUE}
     p = 0.01
-    topTable(fit2,p.value=p, adjust="fdr")
+    results              <- decideTests(fit2,adjust.method="fdr",p.value=p)
+    vennDiagram(results,include = "both", main=paste("Differentially Expressed. P=",p))
+    summary(results)
 ```
 
 The relation of the fold change and the P value is shown below, with 100 top genes are highlighted
@@ -99,90 +98,101 @@ The relation of the fold change and the P value is shown below, with 100 top gen
     volcanoplot(fit2, highlight = 100)
 ```
 
+The list of the genes that are differentially expressed based on F. P Value (Significance `r p`)
+```{r, eval=TRUE, echo=FALSE}
+  selected             <- p.adjust(fit2$F.p.value, method = "fdr") < p  # P Adj ####
+  y = row.names(curr.diff[selected,])
+  z = select(mogene21stprobeset.db, as.character(y), c("SYMBOL","ENTREZID"))
+  levels(as.factor(z$SYMBOL))
+  z
+```
+
 ## Heatmap
-Heat-map for all experiments
+Heat-map for all experiments for the genes above. (`r p=0.01` P= `r p`). Y Axis is the probeset, Z Axis is the experiments.
 
 ```{r, echo=FALSE, eval=TRUE}
-  side.col.full   <- NULL
-  for(c in brewer.pal(8,"Spectral"))
-  side.col.full <- c(side.col.full,rep(c,12))
-
-  heatmap.2(as.matrix(curr.diff[selected==1,]), main = "GLOBAL. F.p.value<5%, Bon", key=TRUE, symkey=FALSE, density.info="none", trace="none", ColSideColors = side.col.full,margins =c(12,9), col=rev(brewer.pal(11, "Spectral")), scale = "none")
+  p=0.01
+  selected             <- p.adjust(fit2$F.p.value, method = "fdr") < p  # P Adj ####
+  heatmap.2(as.matrix(curr.diff[selected,]), main = paste("P",p), key=TRUE, symkey=FALSE, density.info="none", trace="none", ColSideColors = colors.96,margins =c(12,9), col=colors.12, scale = "none")
 ```
 
 Similar to heatmap above, below are the heatmap brokendown into each contrast experiments
 ```{r, echo=FALSE}
+  p=0.01
+  selected             <- p.adjust(fit2$F.p.value, method = "fdr") < p  # P Adj ####
   for(h in c(1,2,3,4))
   {
     par(mfrow=c(2,2))
-    if(h==1){s = c(seq(1,12),seq(13,24))} else if (h==2) {s = seq(25,48)} else if (h==3) {s = seq(49,72)} else {s=seq(73:96)}
-    side.col.full <- c(rep("red",12),rep("green",12))
-  
+    if(h==1){s = c(group1,group2)} else if (h==2) {s = c(group3,group4)} else if (h==3) {s = c(group5,group6)} else {s=c(group7,group8)}
+
     cont = as.factor(c("GROUP1-GROUP2","GROUP3-GROUP4","GROUP5-GROUP6","GROUP7-GROUP8"))
     heatmap.2(as.matrix(curr.diff[selected,s]), main = cont[h], key=TRUE, symkey=FALSE, density.info="none", trace="none",
-         ColSideColors = side.col.full,margins =c(12,9),
-         col=rev(brewer.pal(11, "Spectral")), scale = "none")
+         ColSideColors = colors.24,margins =c(12,9),
+         col=colors.12, scale = "none")
 
     sg             <- p.adjust(fit2$p.value[h], method = "fdr") < p  # P Adj ####
-    if(sum(sg)>2)
+    if(sum(sg)>2){
     heatmap.2(as.matrix(curr.diff[sg,s]), main = paste0(cont[h],"Locally Diff Exp"), key=TRUE, symkey=FALSE, density.info="none", trace="none",
-          ColSideColors = side.col.full,margins =c(12,9),
-          col=rev(brewer.pal(11, "Spectral")), scale = "none")
+          ColSideColors = colors.96,margins =c(12,9),
+          col=colors.12, scale = "none")
+    }
 }
+    par(mfrow=c(1,1))
 
 ```
 
-Summary of DE Genes:
-```{r, echo=FALSE}
-    summary(results)
-    vennDiagram(results,include = "both", main=paste("Differentially Expressed. P=",p))
+
+
+The list of the genes that are differentially expressed for group 1 & 2 (Significance `r p`)
+
+```{r, eval=TRUE, echo=FALSE}
+  results              <- as.data.frame(decideTests(fit2,adjust.method="fdr",p.value=p))
+  y = row.names(results[results[,1]!=0,])
+  z = select(mogene21stprobeset.db, as.character(y), c("SYMBOL","ENTREZID"))
+  levels(as.factor(z$SYMBOL))
+  z
 ```
 
-The list of the genes that are differentially expressed for group 1 & 2 
+Plotting those genes into a heatmap
 
-```{r, eval=TRUE, echo=FALSE, cache=TRUE}
-   sg                  <- p.adjust(fit2$p.value[,1], method = "fdr") < p
-   core.data.ann[sg,c("ENTREZ","SYMBOL","DESC")]
+```{r, echo=FALSE, eval=TRUE}
+  results              <- as.data.frame(decideTests(fit2,adjust.method="fdr",p.value=p))
+  y = row.names(results[results[,1]!=0,])
+  heatmap.2(as.matrix(curr.diff[y,c(group1,group2)]), main = paste("DE in Group 3 & 4. P value=",p), key=TRUE, symkey=FALSE, density.info="none", trace="none", ColSideColors = colors.24,margins =c(12,9), col=colors.12, scale = "none")
 ```
-
 
 The genes that are differentially expressed for group 3 & 4 (Significance `r p`).
-Only probes that are annotated are shown
 
-```{rm, eval=TRUE}
-   sg                  <- p.adjust(fit2$p.value[,2], method = "fdr") < p
-   tmp <-   core.data.ann[sg,c("ENTREZ","SYMBOL","DESC")]
-   tmp <- tmp[(tmp$SYMBOL!="NA" & !is.na(tmp$SYMBOL) & tmp$ENTREZ!="NA" & !is.na(tmp$ENTREZ)),]
-   tmp <- tmp[complete.cases(tmp),]
-   tmp
+```{r, echo=FALSE}
+  results              <- as.data.frame(decideTests(fit2,adjust.method="fdr",p.value=p))
+  y = row.names(results[results[,2]!=0,])
+  select(mogene21stprobeset.db, y, c("SYMBOL","ENTREZID"))
 ```
 
+
+```{r, echo=FALSE}
+  curr.cont <- 2
+  results              <- as.data.frame(decideTests(fit2,adjust.method="fdr",p.value=p))
+  y = row.names(results[results[,curr.cont]!=0,])
+  g.list <- select(mogene21stprobeset.db, as.character(y), c("SYMBOL"))
+  g.list <- g.list[g.list$SYMBOL!="NA" & !is.na(g.list$SYMBOL),]
+  g.name <- levels(as.factor(g.list$SYMBOL))
+  for(i in g.name){
+    tmp <- g.list[g.list$SYMBOL==i,"PROBEID"]
+    bplot(curr.diff[tmp,], by=D, col=colors.8, horizontal=FALSE, main=paste(i))
+   }
+
+```
 
 There's no genes that are differentially expressed in other groups.
-
-## Findings
-Changes before and after Magnesium treatment
-```{r, echo=FALSE}
-   plot(curr.diff[sg,group3], main="GROUP 3",  xlab="Experiment (Mouse)", ylab="Expression Level", col="red")
-   plot(curr.diff[sg,group4], main="GROUP 4", xlab="Experiment (Mouse)", ylab="Expression Level", col="blue")
-  bplot(curr.diff[sg,c(group3,group4)], by=c(rep("GROUP3",12),rep("GROUP4",12)), col=c("red","green"), horizontal=FALSE,main=paste(core.data.ann[sg,"SYMBOL"],"ENTREZ:",core.data.ann[sg,"ENTREZ"]))
-
-```
 
 # AWKNOLEGDEMENT
 This is a part of a class project, TCSS 592 (SEMINAR IN BIOINFORMATICS), Autumn 2015, supervised by Dr. Ka Yee Yeung.
 
 
-# ADDITIONAL INFORMATION
-# Group Mapping
-Here's the mapping and of the files
+## ADDITIONAL INFORMATION
+Group mapping
 ```{r, echo=FALSE, cache=TRUE}
-  t(f.map)
+  f.map
 ```
 
-# Distribution of Differentially Expressed Genes in group 1 & 2
-```{r, eval=TRUE, echo=FALSE, cache=TRUE}
-   sg                  <- p.adjust(fit2$p.value[,1], method = "fdr") < p
-   for(i in sg)
-    bplot(curr.diff[i,c(group1,group2)], by=D[c(group1,group2)], col=c("blue","green"), horizontal=FALSE, main=paste(core.data.ann[which(core.data.ann$ENTREZ==i),"SYMBOL"],"ENTREZ:",i))
-```
