@@ -1,6 +1,8 @@
 # This is for class TCSS 592 
 # By Daniel Kristiyanto (danielkr@uw.edu)
 # Fall 2015
+#################################### REQUIRED PACKAGES ######################################
+
 working.dir <- "~/Google Drive/BIOINFORMATICS/Madigan"
 setwd(working.dir)
 
@@ -38,110 +40,68 @@ for(n in 1:8)
 
 # Setting environtment
 source("https://bioconductor.org/biocLite.R")
+#biocLite("affy")
+#biocLite("affxparser")
+library("affy")
+library("affxparser")
+
 library("oligo")
 library("limma")
 library("gplots")
 library("scales")
 library("reshape2")
 
+###################################### READING THE FILES (FROM KEVIN) ######################################
+
 # Read the files
-cel.files     <- list.celfiles(path="~/Google Drive/BIOINFORMATICS/Madigan/LPS Study",full.names=TRUE)
-core.cel      <- read.celfiles(cel.files)
-core.rma      <- rma(core.cel)
-core.exp      <- exprs(core.rma)
-write.exprs(core.rma, file("OUTPUT/Seahawk-RMA.txt")) # Save it
-names(core.exp) <- all.groups
+col.names       <- NULL
+row.names       <- NULL
+#READ A FILE 
+
+core.data        <- NULL
+
+setwd(paste0(working.dir,"/PLIER/Madigan_LPS_CHP/"))
+## LOOP THROUGH ALL FILES AND APPEND THE COLUMNS
+for (file in list.files())
+{
+  cat("Working on", file,"\n")
+  shortname   <- sub("\\..*","", file)
+  col.names   <- c(col.names, shortname)
+  curr.chp    <- readChp(file, withQuant = TRUE)
+  
+  if (length(row.names) == 0) # THIS IS THE FIRST TIME SO CAPTURE ROW NAMES
+  row.names   <- curr.chp$QuantificationEntries[[1]] 
+  core.data   <- cbind(core.data, curr.chp$QuantificationEntries[[2]])
+}
+
+core.data           <- as.data.frame(core.data)
+rownames(core.data) <- row.names
+colnames(core.data) <- all.groups
 
 #################################### ANNOTATION ######################################
 # Annotation Data
 # Compare Genes 3 & 4
 # biocLite("mogene21sttranscriptcluster.db")
-library("mogene21sttranscriptcluster.db")
+# library("mogene21sttranscriptcluster.db")
 mogene21sttranscriptcluster()
 annotation.mogene   <- data.frame(ENTREZ=sapply(contents(mogene21sttranscriptclusterENTREZID),paste,collapse=", "),
                     ACCNUM=sapply(contents(mogene21sttranscriptclusterACCNUM), paste, collapse=", "), 
                     SYMBOL=sapply(contents(mogene21sttranscriptclusterSYMBOL), paste, collapse=", "), 
                     DESC=sapply(contents(mogene21sttranscriptclusterGENENAME), paste, collapse=", "))
-
-core.data             <- merge(core.exp, annotation.mogene, by.x=0, by.y=0, all=T)
-row.names(core.data)  <- core.data[,1]
-core.data[,1]         <- NULL
 # write.csv(core.data,file="OUTPUT/core.data.txt",sep="\t", row.names = T)
-
-# TABLEU #########
-# Augmenting the data for Tableu visualization 
-
-if(tableu==1)
-{
-  core.annotated      <- NULL
-  for(i in 1:8)
-  {
-    SQ          <- group.names[i]
-    IU          <- subgroup.names[i]
-    assign(paste(text=paste0("subset",i)), cbind(SQ,IU,core.data[,97:100],
-                                                 core.data[,eval(parse(text=paste0("group",i)))]))
-    
-    tmp         <- get(paste(text=paste0("subset",i)))
-    names(tmp)  <- c("SQ","IU","ENTREZ","ACCNUM","SYMBOL","DESC",
-                         "MOUSE1","MOUSE2","MOUSE3","MOUSE4","MOUSE5","MOUSE6","MOUSE7",
-                         "MOUSE8","MOUSE9","MOUSE10","MOUSE11","MOUSE12")
-    core.annotated <- rbind(core.annotated, tmp)
-  }
-  # write.csv(core.reshape,file="OUTPUT/core.annotated.txt", row.names = T)
-  
-    dim(core.annotated)
-    core.reshape  <- melt(core.annotated, id.vars = c("ENTREZ","SQ","IU","ACCNUM","SYMBOL","DESC"))
-    colnames(core.reshape)[7] <- "EXPERIMENT"
-    colnames(core.reshape)[8] <- "EXPRESSION"
-    write.csv(core.reshape,file="OUTPUT/core.aug.txt", row.names = T)
-}
-
-
-#################################### GENERATE GRAPHS ######################################
-graphs = 0
-if(graphs==1)
-{
-  # Create draw histogram for Tlr4 Histogram 
-  par(mfrow=c(2,2))
-  for(i in 1:8)
-  {
-    curr.group <- eval(parse(text=paste0("group",i)))
-    plot(t(core.data[core.data$SYMBOL=="Tlr4",curr.group]),
-         main=paste("TLR4",group.names[i]), ylab="Expression Level", type="b", xlab="Sample", col="blue", 
-         ylim=c(0,4))
-  }
-  
-  # Draw boxplot distribution comparassion
-  par(mfrow=c(2,2))
-  for(i in 1:8)
-  {
-    curr.group <- eval(parse(text=paste0("group",i)))
-    boxplot(t(core.data[core.data$SYMBOL=="Tlr4",curr.group]),
-            main=group.names[i])
-  }
-}
+core.data.ann       <- merge(core.data, annotation.mogene, by.x=0, by.y=0, all=T)
 
 #################################### DIFFERENTIAL EXPRESSION ######################################
 
-# 1: ALL
-# 2: OUTLIERS SAMPLES (MICE REMOVED)
-# 3: UKNOWN GENES REMOVED
-# 4: OUTLIERS SAMPLES AND UNKNOWN GENES REMOVED
 hmap          <- 1
-# load("~/Google Drive/BIOINFORMATICS/Madigan/b4crash.RData")
 
 if(hmap==1)
 {
-  # table.for.diff            <- core.data[core.data$ENTREZ!="NA",]
   table.for.diff            <- core.data
-  table.for.diff$ACCNUM     <- NULL
-  table.for.diff$DESC       <- NULL
-  # gene.names                <- factor(paste(table.for.diff$SYMBOL,row.names(table.for.diff),"at",sep = "_"))
-  # row.names(table.for.diff) <- gene.names
-  table.for.diff$SYMBOL     <- NULL
-  names(table.for.diff)     <- all.groups
   p.distribution            <- NULL
   t.distribution            <- NULL
+  selected.genes            <- NULL
+  
   
   for(n in c(1,3,5,7))
   {
@@ -156,7 +116,7 @@ if(hmap==1)
 
       design                <- model.matrix(~0 + pert.names)
       colnames(design)      <- levels(pert.names)
-      graph.name            <- paste(grp.a,grp.b) 
+      graph.name            <- paste(grp.a,grp.b,"PLIER") 
     
       fit                   <- lmFit(curr.diff,design) 
       cont.matrix           <- makeContrasts(eval(parse(text=grp.a))-eval(parse(text=grp.b)), levels=design)
@@ -174,7 +134,8 @@ if(hmap==1)
       volcanoplot(fit2, main=graph.name, names=fit2$genes$ID, highlight = 50)
       dev.off()
       
-      selected              <- p.adjust(fit2$p.value < 0.05, method = "bonferroni")
+      selected              <- p.adjust(fit2$p.value < 0.01, method = "bonferroni")
+      selected.genes        <- rbind(selected.genes, cbind(graph.name,core.data.ann[selected==1,]))
       row_distance          <- dist(as.matrix(curr.diff[selected==1,]), method = "manhattan")
       row_cluster           <- hclust(row_distance, method = "ward.D")
       col_distance          <- dist(t(as.matrix(curr.diff[selected==1,])), method = "manhattan")
@@ -191,13 +152,49 @@ if(hmap==1)
   }
   p.tableu          <- as.data.frame(rbind(p.distribution,t.distribution))
   names(p.tableu)   <- c("LABEL","Group","Probe No","Value")
-  write.csv(p.tableu,file="OUTPUT/p-dist.csv", row.names = F)
+  write.csv(p.tableu,file=paste0(working.dir,"/OUTPUT/p-dist-plier.csv"), row.names = F)
+  write.csv(selected.genes,file=paste0(working.dir,"/OUTPUT/selectedgenes-plier.csv"))
 }
 
-# ALL DATA ##########
-all.data =1 
 
-if(dall.data==1)
+
+# TABLEU #########
+# Augmenting the data for Tableu visualization 
+tableu = 1
+if(tableu==1)
+{
+  
+  core.annotated      <- NULL
+  for(i in 1:8)
+  {
+    SQ          <- group.names[i]
+    IU          <- subgroup.names[i]
+    assign(paste(text=paste0("subset",i)), cbind(paste0("GROUP",i),SQ,IU,core.data.ann[,c("ENTREZ","ACCNUM","SYMBOL","DESC")],
+                                                 core.data.ann[,eval(parse(text=paste0("group",i)))]))
+    
+    tmp         <- get(paste(text=paste0("subset",i)))
+    names(tmp)  <- c("GROUP","SQ","IU","ENTREZ","ACCNUM","SYMBOL","DESC",
+                     "MOUSE1","MOUSE2","MOUSE3","MOUSE4","MOUSE5","MOUSE6","MOUSE7",
+                     "MOUSE8","MOUSE9","MOUSE10","MOUSE11","MOUSE12")
+    core.annotated <- rbind(core.annotated, tmp)
+  }
+  
+  dim(core.annotated)
+  core.reshape  <- melt(core.annotated, id.vars = c("GROUP","ENTREZ","SQ","IU","ACCNUM","SYMBOL","DESC"))
+  colnames(core.reshape)[8] <- "EXPERIMENT"
+  colnames(core.reshape)[9] <- "EXPRESSION"
+  write.csv(core.reshape,file=paste0(working.dir,"/OUTPUT/core.aug.plier.txt"), row.names = T)
+  
+  
+  ### SELECTED GENES ##
+  selected.reshape <- melt(selected.genes, id.vars = c("graph.name", "Row.names","ENTREZ","ACCNUM","SYMBOL","DESC"))
+  write.csv(selected.reshape,file=paste0(working.dir,"/OUTPUT/selected.tableu.aug.plier.txt"), row.names = T)
+}
+
+
+#################################### ANNOTATION ######################################
+all.data =1
+if(all.data==1)
 {
   # table.for.diff            <- core.data[core.data$ENTREZ!="NA",]
   table.for.diff            <- core.data
@@ -221,17 +218,16 @@ if(dall.data==1)
   fit2                  <- contrasts.fit(fit,cont.matrix)
   fit2                  <- eBayes(fit2)
   topTable(fit2,coef=1, adjust="bonferroni")
-  graph.name            <- paste("All Groups") 
+  graph.name            <- paste("All Groups Plier") 
   
   
-  selected              <- p.adjust(fit2$p.value < 0.05, method = "bonferroni")
+  selected              <- p.adjust(fit2$p.value < 0.01, method = "bonferroni")
   row_distance          <- dist(as.matrix(curr.diff[selected==1,]), method = "manhattan")
-  row_cluster           <- hclust(row_distance, method = "ward.D")
+  row_cluster           <- hclust(row_distance)
   col_distance          <- dist(t(as.matrix(curr.diff[selected==1,])), method = "manhattan")
   col_cluster           <- hclust(col_distance, method = "ward.D")
   
   png(file=paste0(working.dir,"/graph/allgenes-",graph.name,".png"),width = 900, height = 900, units = "px")
   heatmap.2(as.matrix(curr.diff), main = graph.name, key=TRUE, symkey=FALSE, density.info="none", trace="none", scale="none"
              ,ColSideColors = c(rep("green", 12),rep("blue", 12), rep("yellow",12),rep("red",12),rep("black",12),rep("brown",12),rep("white",12),rep=("darkorchid")),na.color = "black")
-  
 }

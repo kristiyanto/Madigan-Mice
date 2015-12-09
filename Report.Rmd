@@ -1,0 +1,188 @@
+---
+title: "Differential Gene Expression: Magnesium Sulfate for Neuralprotection"
+author: "Daniel Kristiyanto (danielkr@uw.edu), Troy Hasagen, Yingying Xia"
+date: "December 8, 2015"
+output: 
+  html_document: 
+    fig_caption: yes
+    theme: flatly
+---
+```{r, echo=FALSE, results="hide", warning=FALSE, eval=TRUE, cache=TRUE}
+ 
+# Setting environtment
+source("https://bioconductor.org/biocLite.R")
+library("limma")
+library("gplots")
+library("reshape2")
+library("RColorBrewer")
+library("oligo")
+library("fields")
+working.dir <- "~/Google Drive/BIOINFORMATICS/Madigan"
+setwd(working.dir)
+
+#################################### PARAMETERS ######################################
+  load("tomarkdown.RData")
+  core.data.ann       <- merge(curr.diff, ann.data, by.x=0, by.y=0, all=T)
+
+  f.map = cbind(colnames(exprs(core.rma)),all.grp)
+```
+
+# Introduction
+The experiment are conducted by Madigan Army Center, with 96 mice, for 8 groups. 
+
+## Raw Data
+Here's the Raw data from the CEL files provided
+```{r, echo=FALSE, cache=TRUE}
+  boxplot(core.cel, which=c("all"), transfo=identity, nsample=40000, main="Raw Data (Log2)")
+  
+  boxplot(core.cel, which=c("all"), transfo=log2, nsample=40000, main="Raw Data (Log2)")
+```
+
+## Normalization
+Subsequent the reading, Normalization was applied. After few comparing some of the normalization methods, QSpline was chosed for the best method. Here's the data after normalization.
+
+```{r, echo=FALSE, cache=TRUE}
+  boxplot(core.qsp, which=c("all"), transfo=identity, nsample=40000, main="QSpline Normalized")
+  boxplot(core.qsp, which=c("all"), transfo=log2, nsample=40000, main="QSspline Normalized (Log2)")
+```
+
+Once normalized, RMA was extracted with background correction. Here's the result
+```{r, echo=FALSE, cache=TRUE}
+ boxplot(core.rma, transfo=identity, nsample=40000, main="RMA")
+```
+
+# Sanity Check
+Distribution of genes with prior knowlegde/asumptions.
+```{r, echo=FALSE, eval=TRUE}
+  library("fields")
+
+  tmp = c(21898,21926,16193,16183,18823,18227)
+  tmp.c = c(brewer.pal(11,"Spectral"),"red")
+  
+  for(i in tmp)
+    bplot(curr.diff[which(core.data.ann$ENTREZ==i),], by=D, col=tmp.c, horizontal=FALSE, main=paste(core.data.ann[which(core.data.ann$ENTREZ==i),"SYMBOL"],"ENTREZ:",i))
+
+```
+
+
+# Differential Gene Expression
+Differential Gene Expression was conducted using LIMMA. 
+Here's the the distribution of the P Value and the T statistic
+```{r, echo=FALSE, cache=TRUE}
+
+    hist(fit2$F.p.value, main=paste("All. F. P Value"), freq=T, breaks=seq(0,1,p), xlab="PValue", col=brewer.pal(11,"Spectral"))
+    
+    hist(fit2$t, main=paste("T Statistic"), freq=T, breaks=seq(-10,10,p), xlab="TStatistic", col=brewer.pal(12, "Paired"))
+
+```
+
+Here's the Top Genes that are differential expressed (Significance `r p`)
+
+```{r, echo=FALSE, eval=TRUE}
+    p = 0.05
+    topTable(fit2,p.value=p, adjust="fdr")
+    summary(results)
+    vennDiagram(results,include = "both", main=paste("Differentially Expressed. P=",p))
+    p = 0.01
+```
+
+Narrowing down the P Value (Significance `r p`)
+
+```{r, echo=FALSE, eval=TRUE}
+    p = 0.01
+    topTable(fit2,p.value=p, adjust="fdr")
+```
+
+The relation of the fold change and the P value is shown below, with 100 top genes are highlighted
+
+```{r, echo=FALSE}
+    volcanoplot(fit2, highlight = 100)
+```
+
+## Heatmap
+Heat-map for all experiments
+
+```{r, echo=FALSE, eval=TRUE}
+  side.col.full   <- NULL
+  for(c in brewer.pal(8,"Spectral"))
+  side.col.full <- c(side.col.full,rep(c,12))
+
+  heatmap.2(as.matrix(curr.diff[selected==1,]), main = "GLOBAL. F.p.value<5%, Bon", key=TRUE, symkey=FALSE, density.info="none", trace="none", ColSideColors = side.col.full,margins =c(12,9), col=rev(brewer.pal(11, "Spectral")), scale = "none")
+```
+
+Similar to heatmap above, below are the heatmap brokendown into each contrast experiments
+```{r, echo=FALSE}
+  for(h in c(1,2,3,4))
+  {
+    par(mfrow=c(2,2))
+    if(h==1){s = c(seq(1,12),seq(13,24))} else if (h==2) {s = seq(25,48)} else if (h==3) {s = seq(49,72)} else {s=seq(73:96)}
+    side.col.full <- c(rep("red",12),rep("green",12))
+  
+    cont = as.factor(c("GROUP1-GROUP2","GROUP3-GROUP4","GROUP5-GROUP6","GROUP7-GROUP8"))
+    heatmap.2(as.matrix(curr.diff[selected,s]), main = cont[h], key=TRUE, symkey=FALSE, density.info="none", trace="none",
+         ColSideColors = side.col.full,margins =c(12,9),
+         col=rev(brewer.pal(11, "Spectral")), scale = "none")
+
+    sg             <- p.adjust(fit2$p.value[h], method = "fdr") < p  # P Adj ####
+    if(sum(sg)>2)
+    heatmap.2(as.matrix(curr.diff[sg,s]), main = paste0(cont[h],"Locally Diff Exp"), key=TRUE, symkey=FALSE, density.info="none", trace="none",
+          ColSideColors = side.col.full,margins =c(12,9),
+          col=rev(brewer.pal(11, "Spectral")), scale = "none")
+}
+
+```
+
+Summary of DE Genes:
+```{r, echo=FALSE}
+    summary(results)
+    vennDiagram(results,include = "both", main=paste("Differentially Expressed. P=",p))
+```
+
+The list of the genes that are differentially expressed for group 1 & 2 
+
+```{r, eval=TRUE, echo=FALSE, cache=TRUE}
+   sg                  <- p.adjust(fit2$p.value[,1], method = "fdr") < p
+   core.data.ann[sg,c("ENTREZ","SYMBOL","DESC")]
+```
+
+
+The genes that are differentially expressed for group 3 & 4 (Significance `r p`).
+Only probes that are annotated are shown
+
+```{rm, eval=TRUE}
+   sg                  <- p.adjust(fit2$p.value[,2], method = "fdr") < p
+   tmp <-   core.data.ann[sg,c("ENTREZ","SYMBOL","DESC")]
+   tmp <- tmp[(tmp$SYMBOL!="NA" & !is.na(tmp$SYMBOL) & tmp$ENTREZ!="NA" & !is.na(tmp$ENTREZ)),]
+   tmp <- tmp[complete.cases(tmp),]
+   tmp
+```
+
+
+There's no genes that are differentially expressed in other groups.
+
+## Findings
+Changes before and after Magnesium treatment
+```{r, echo=FALSE}
+   plot(curr.diff[sg,group3], main="GROUP 3",  xlab="Experiment (Mouse)", ylab="Expression Level", col="red")
+   plot(curr.diff[sg,group4], main="GROUP 4", xlab="Experiment (Mouse)", ylab="Expression Level", col="blue")
+  bplot(curr.diff[sg,c(group3,group4)], by=c(rep("GROUP3",12),rep("GROUP4",12)), col=c("red","green"), horizontal=FALSE,main=paste(core.data.ann[sg,"SYMBOL"],"ENTREZ:",core.data.ann[sg,"ENTREZ"]))
+
+```
+
+# AWKNOLEGDEMENT
+This is a part of a class project, TCSS 592 (SEMINAR IN BIOINFORMATICS), Autumn 2015, supervised by Dr. Ka Yee Yeung.
+
+
+# ADDITIONAL INFORMATION
+# Group Mapping
+Here's the mapping and of the files
+```{r, echo=FALSE, cache=TRUE}
+  t(f.map)
+```
+
+# Distribution of Differentially Expressed Genes in group 1 & 2
+```{r, eval=TRUE, echo=FALSE, cache=TRUE}
+   sg                  <- p.adjust(fit2$p.value[,1], method = "fdr") < p
+   for(i in sg)
+    bplot(curr.diff[i,c(group1,group2)], by=D[c(group1,group2)], col=c("blue","green"), horizontal=FALSE, main=paste(core.data.ann[which(core.data.ann$ENTREZ==i),"SYMBOL"],"ENTREZ:",i))
+```

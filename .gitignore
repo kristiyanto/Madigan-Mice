@@ -3,10 +3,17 @@ LPS Study/*
 TABLEU/*
 PAPERS/*
 RAW DATA/*
+PLIER/*
+Report_cache/*
+GRAPH/*
+Presentation/*
+Report_files/*
+GRAPH
 *.RData
 *.Rhistory
 *.csv
 *.CEL
 *.xls
 *.xlsx
+*.html
 
