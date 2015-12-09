@@ -1,9 +1,10 @@
 ---
-title: "Differential Gene Expression: Magnesium Sulfate for Neuralprotection"
+title: 'Differential Gene Expression: Magnesium Sulfate for Neuralprotection'
 author: "Daniel Kristiyanto (danielkr@uw.edu), Troy Hasagen, Yingying Xia"
 date: "December 8, 2015"
-output: 
-  html_document: 
+output:
+  pdf_document: default
+  html_document:
     fig_caption: yes
     theme: flatly
 ---
@@ -17,6 +18,7 @@ library("fields")
 library("annotate")
 library("mogene21stprobeset.db")
 library("limma")
+library("oligo")
 working.dir <- "~/Google Drive/BIOINFORMATICS/Madigan"
 setwd(working.dir)
 load("tomarkdown.RData")
@@ -26,11 +28,15 @@ load("tomarkdown.RData")
 # Introduction
 The experiment are conducted by Madigan Army Center, with 96 mice, for 8 groups.
 The entire analisys is done in R on the probeset data (latter annotated).
-The scripts are available at http://github.com/kristiyanto
+
+The scripts are available at https://github.com/kristiyanto/Madigan-Mice.
 
 ## Raw Data
-Here's the Raw data from the CEL files provided
-```{r, echo=FALSE, cache=TRUE}
+Raw data from the CEL files provided
+
+```{r, echo=FALSE, cache=FALSE, fig.align='center'}
+  par(mfrow=c(1,1), las=1)
+
   boxplot(core.cel, which=c("all"), transfo=identity, nsample=40000, main="Raw Data")
   
   boxplot(core.cel, which=c("all"), transfo=log2, nsample=40000, main="Raw Data (Log2)")
@@ -39,19 +45,25 @@ Here's the Raw data from the CEL files provided
 ## Normalization
 Subsequent the reading, Normalization was applied. After few comparing some of the normalization methods, QSpline was chosed for the best method. Here's the data after normalization.
 
-```{r, echo=FALSE, cache=TRUE}
+```{r, echo=FALSE, fig.align='center'}
+  par(mfrow=c(1,1), las=1)
   boxplot(core.qsp, which=c("all"), transfo=identity, nsample=40000, main="QSpline Normalized")
   boxplot(core.qsp, which=c("all"), transfo=log2, nsample=40000, main="QSspline Normalized (Log2)")
 ```
 
 Once normalized, RMA was extracted with background correction.
-```{r, echo=FALSE, cache=TRUE}
+
+```{r, echo=FALSE, fig.align='center'}
+ par(mfrow=c(1,1), las=1)
  boxplot(core.rma, transfo=identity, nsample=40000, main="RMA")
 ```
 
 # Sanity Check
-Distribution of genes with prior knowlegde/asumptions.
-```{r, echo=FALSE, eval=TRUE}
+Distribution of genes known genes.
+
+```{r, echo=FALSE, eval=TRUE,fig.align='center'}
+  
+  par(mfrow=c(1,2), las=1)
   for(i in known.genes)
   {
     mapping   <- select(mogene21stprobeset.db, as.character(i), c("PROBEID"), keytype="ENTREZID")
@@ -65,9 +77,10 @@ Distribution of genes with prior knowlegde/asumptions.
 # Differential Gene Expression
 Differential Gene Expression was conducted using LIMMA.
 Here's the the distribution of the P Value and the T statistic
-```{r, echo=FALSE, cache=TRUE}
 
-    hist(fit2$F.p.value, main=paste("All. F. P Value"), freq=T, breaks=seq(0,1,p), xlab="PValue", col=colors.12)
+```{r, echo=FALSE, fig.align='center'}
+    par(mfrow=c(1,2), las=1)
+    hist(fit2$F.p.value, main=paste("All. F. P Value"), freq=T, breaks=seq(0,1,p), xlab="PValue", col=colors.12p)
     
     hist(fit2$t, main=paste("T Statistic"), freq=T, breaks=seq(-10,10,p), xlab="TStatistic", col=colors.12p)
 
@@ -75,7 +88,7 @@ Here's the the distribution of the P Value and the T statistic
 
 Here's the Top Genes that are differential expressed (Significance `r p`)
 
-```{r, echo=FALSE, eval=TRUE}
+```{r, echo=FALSE, eval=TRUE,fig.align='center'}
     p = 0.05
     results              <- decideTests(fit2,adjust.method="fdr",p.value=p)
     topTable(fit2,p.value=p, adjust="fdr")
@@ -85,30 +98,43 @@ Here's the Top Genes that are differential expressed (Significance `r p`)
 
 ## Narrowing down the P Value (Significance `r p=0.01` `r p`)
 Summary of DE Genes:
-```{r, echo=FALSE, eval=TRUE}
+
+```{r, echo=FALSE, eval=TRUE,fig.align='center'}
     p = 0.01
     results              <- decideTests(fit2,adjust.method="fdr",p.value=p)
     vennDiagram(results,include = "both", main=paste("Differentially Expressed. P=",p))
     summary(results)
 ```
 
-The relation of the fold change and the P value is shown below, with 100 top genes are highlighted
+The relation of the fold change and the P value is shown below, with 40 top genes are highlighted
 
-```{r, echo=FALSE}
-    volcanoplot(fit2, highlight = 100)
+```{r, echo=FALSE,fig.align='center'}
+    volcanoplot(fit2, highlight = 40)
 ```
 
-The list of the genes that are differentially expressed based on F. P Value (Significance `r p`)
+The list of the genes that are differentially expressed based on F. P Value (Significance `r p`). 
+
+Summary:
+
 ```{r, eval=TRUE, echo=FALSE}
   selected             <- p.adjust(fit2$F.p.value, method = "fdr") < p  # P Adj ####
   y = row.names(curr.diff[selected,])
   z = select(mogene21stprobeset.db, as.character(y), c("SYMBOL","ENTREZID"))
   levels(as.factor(z$SYMBOL))
+
+```
+
+In detailed:
+
+```{r, eval=TRUE, echo=FALSE}
+  selected             <- p.adjust(fit2$F.p.value, method = "fdr") < p  # P Adj ####
+  y = row.names(curr.diff[selected,])
+  z = select(mogene21stprobeset.db, as.character(y), c("SYMBOL","ENTREZID"))
   z
 ```
 
 ## Heatmap
-Heat-map for all experiments for the genes above. (`r p=0.01` P= `r p`). Y Axis is the probeset, Z Axis is the experiments.
+Heat-map for all experiments for the genes above. (`r p=0.01` P= `r p`). Y Axis is the probeset, X Axis and the side color bands are the experiments.
 
 ```{r, echo=FALSE, eval=TRUE}
   p=0.01
@@ -117,45 +143,49 @@ Heat-map for all experiments for the genes above. (`r p=0.01` P= `r p`). Y Axis 
 ```
 
 Similar to heatmap above, below are the heatmap brokendown into each contrast experiments
-```{r, echo=FALSE}
+
+```{r, echo=FALSE, fig.align='center'}
   p=0.01
   selected             <- p.adjust(fit2$F.p.value, method = "fdr") < p  # P Adj ####
   for(h in c(1,2,3,4))
   {
-    par(mfrow=c(2,2))
     if(h==1){s = c(group1,group2)} else if (h==2) {s = c(group3,group4)} else if (h==3) {s = c(group5,group6)} else {s=c(group7,group8)}
-
+      par(mfrow=c(1,2), las=1)
     cont = as.factor(c("GROUP1-GROUP2","GROUP3-GROUP4","GROUP5-GROUP6","GROUP7-GROUP8"))
     heatmap.2(as.matrix(curr.diff[selected,s]), main = cont[h], key=TRUE, symkey=FALSE, density.info="none", trace="none",
          ColSideColors = colors.24,margins =c(12,9),
          col=colors.12, scale = "none")
-
-    sg             <- p.adjust(fit2$p.value[h], method = "fdr") < p  # P Adj ####
-    if(sum(sg)>2){
-    heatmap.2(as.matrix(curr.diff[sg,s]), main = paste0(cont[h],"Locally Diff Exp"), key=TRUE, symkey=FALSE, density.info="none", trace="none",
-          ColSideColors = colors.96,margins =c(12,9),
-          col=colors.12, scale = "none")
-    }
-}
-    par(mfrow=c(1,1))
+  }
 
 ```
 
 
 
-The list of the genes that are differentially expressed for group 1 & 2 (Significance `r p`)
+The list of the genes that are differentially expressed for group 1 & 2 (Significance `r p`).
+
+Summary:
 
 ```{r, eval=TRUE, echo=FALSE}
   results              <- as.data.frame(decideTests(fit2,adjust.method="fdr",p.value=p))
   y = row.names(results[results[,1]!=0,])
   z = select(mogene21stprobeset.db, as.character(y), c("SYMBOL","ENTREZID"))
   levels(as.factor(z$SYMBOL))
+```
+
+In Detailed:
+
+```{r, eval=TRUE, echo=FALSE}
+  results              <- as.data.frame(decideTests(fit2,adjust.method="fdr",p.value=p))
+  y = row.names(results[results[,1]!=0,])
+  z = select(mogene21stprobeset.db, as.character(y), c("SYMBOL","ENTREZID"))
   z
 ```
 
 Plotting those genes into a heatmap
 
-```{r, echo=FALSE, eval=TRUE}
+```{r, echo=FALSE, eval=TRUE, fig.align='center'}
+  par(mfrow=c(1,1), las=1)
+
   results              <- as.data.frame(decideTests(fit2,adjust.method="fdr",p.value=p))
   y = row.names(results[results[,1]!=0,])
   heatmap.2(as.matrix(curr.diff[y,c(group1,group2)]), main = paste("DE in Group 3 & 4. P value=",p), key=TRUE, symkey=FALSE, density.info="none", trace="none", ColSideColors = colors.24,margins =c(12,9), col=colors.12, scale = "none")
@@ -163,14 +193,14 @@ Plotting those genes into a heatmap
 
 The genes that are differentially expressed for group 3 & 4 (Significance `r p`).
 
-```{r, echo=FALSE}
+```{r, echo=FALSE, fig.align='center'}
   results              <- as.data.frame(decideTests(fit2,adjust.method="fdr",p.value=p))
   y = row.names(results[results[,2]!=0,])
   select(mogene21stprobeset.db, y, c("SYMBOL","ENTREZID"))
 ```
 
 
-```{r, echo=FALSE}
+```{r, echo=FALSE, fig.align='center'}
   curr.cont <- 2
   results              <- as.data.frame(decideTests(fit2,adjust.method="fdr",p.value=p))
   y = row.names(results[results[,curr.cont]!=0,])
@@ -192,7 +222,8 @@ This is a part of a class project, TCSS 592 (SEMINAR IN BIOINFORMATICS), Autumn 
 
 ## ADDITIONAL INFORMATION
 Group mapping
-```{r, echo=FALSE, cache=TRUE}
+
+```{r, echo=FALSE}
   f.map
 ```
 
