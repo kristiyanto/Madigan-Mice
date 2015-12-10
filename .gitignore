@@ -17,3 +17,7 @@ GRAPH
 *.xlsx
 *.html
 
+
+*.RDataTmp
+
+*.pdf
