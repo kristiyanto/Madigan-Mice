@@ -29,7 +29,7 @@ load("tomarkdown.RData")
 
 # Introduction
 The experiment are conducted by Madigan Army Center, with 96 mice, for 8 groups.
-The entire analysis is done in R on the probe-set data (latter annotated).
+The entire analysis is done in R on the probe-set data (later annotated).
 
 The scripts are available at https://github.com/kristiyanto/Madigan-Mice.
 
