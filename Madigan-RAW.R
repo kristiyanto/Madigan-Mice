@@ -4,6 +4,11 @@
 # LATEST VERSION.
 # THIS FILE READ THE CEL FILE PROVIDED BY MADIGAN 
 # (RAW DATA)
+#
+# ╔═════════════════════════╗
+# ║  I ♥ Source Viewing! :) ║
+# ╚═════════════════════════╝
+#
 #################################### REQUIRED PACKAGES ######################################
 
 # Setting environtment
