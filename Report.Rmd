@@ -3,7 +3,9 @@ title: 'Differential Gene Expression: Magnesium Sulfate for Neuralprotection'
 author: "Daniel Kristiyanto (danielkr@uw.edu), Troy Hasagen, Yingying Xia"
 date: "December 8, 2015"
 output:
-  pdf_document: default
+  pdf_document: 
+    highlight: espresso
+    number_sections: yes
   html_document:
     fig_caption: yes
     theme: flatly
@@ -27,7 +29,7 @@ load("tomarkdown.RData")
 
 # Introduction
 The experiment are conducted by Madigan Army Center, with 96 mice, for 8 groups.
-The entire analisys is done in R on the probeset data (latter annotated).
+The entire analysis is done in R on the probe-set data (latter annotated).
 
 The scripts are available at https://github.com/kristiyanto/Madigan-Mice.
 
@@ -43,7 +45,7 @@ Raw data from the CEL files provided
 ```
 
 ## Normalization
-Subsequent the reading, Normalization was applied. After few comparing some of the normalization methods, QSpline was chosed for the best method. Here's the data after normalization.
+Subsequent the reading, Normalization was applied. After few comparing some of the normalization methods, QSpline was chosen for the best method. Here's the data after normalization.
 
 ```{r, echo=FALSE, fig.align='center'}
   par(mfrow=c(1,1), las=1)
@@ -112,7 +114,7 @@ The relation of the fold change and the P value is shown below, with 40 top gene
     volcanoplot(fit2, highlight = 40)
 ```
 
-The list of the genes that are differentially expressed based on F. P Value (Significance `r p`). 
+The list of the genes that are deferentially expressed based on F. P Value (Significance `r p`). 
 
 Summary:
 
@@ -134,7 +136,7 @@ In detailed:
 ```
 
 ## Heatmap
-Heat-map for all experiments for the genes above. (`r p=0.01` P= `r p`). Y Axis is the probeset, X Axis and the side color bands are the experiments.
+Heat-map for all experiments for the genes above. (`r p=0.01` P= `r p`). Y Axis is the pro-beset, X Axis and the side color bands are the experiments.
 
 ```{r, echo=FALSE, eval=TRUE}
   p=0.01
@@ -142,7 +144,7 @@ Heat-map for all experiments for the genes above. (`r p=0.01` P= `r p`). Y Axis 
   heatmap.2(as.matrix(curr.diff[selected,]), main = paste("P",p), key=TRUE, symkey=FALSE, density.info="none", trace="none", ColSideColors = colors.96,margins =c(12,9), col=colors.12, scale = "none")
 ```
 
-Similar to heatmap above, below are the heatmap brokendown into each contrast experiments
+Similar to heat-map above, below are the heat-map broken-down into each contrast experiments
 
 ```{r, echo=FALSE, fig.align='center'}
   p=0.01
@@ -161,7 +163,7 @@ Similar to heatmap above, below are the heatmap brokendown into each contrast ex
 
 
 
-The list of the genes that are differentially expressed for group 1 & 2 (Significance `r p`).
+The list of the genes that are deferentially expressed for group 1 & 2 (Significance `r p`).
 
 Summary:
 
@@ -181,7 +183,7 @@ In Detailed:
   z
 ```
 
-Plotting those genes into a heatmap
+Plotting those genes into a heat-map
 
 ```{r, echo=FALSE, eval=TRUE, fig.align='center'}
   par(mfrow=c(1,1), las=1)
@@ -191,7 +193,7 @@ Plotting those genes into a heatmap
   heatmap.2(as.matrix(curr.diff[y,c(group1,group2)]), main = paste("DE in Group 3 & 4. P value=",p), key=TRUE, symkey=FALSE, density.info="none", trace="none", ColSideColors = colors.24,margins =c(12,9), col=colors.12, scale = "none")
 ```
 
-The genes that are differentially expressed for group 3 & 4 (Significance `r p`).
+The genes that are deferentially expressed for group 3 & 4 (Significance `r p`).
 
 ```{r, echo=FALSE, fig.align='center'}
   results              <- as.data.frame(decideTests(fit2,adjust.method="fdr",p.value=p))
@@ -214,13 +216,13 @@ The genes that are differentially expressed for group 3 & 4 (Significance `r p`)
 
 ```
 
-There's no genes that are differentially expressed in other groups.
+There's no genes that are deferentially expressed in other groups.
 
-# AWKNOLEGDEMENT
+# Acknowledgement
 This is a part of a class project, TCSS 592 (SEMINAR IN BIOINFORMATICS), Autumn 2015, supervised by Dr. Ka Yee Yeung.
 
 
-## ADDITIONAL INFORMATION
+## Additional Information
 Group mapping
 
 ```{r, echo=FALSE}
