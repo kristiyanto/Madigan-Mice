@@ -3,12 +3,12 @@ title: 'Differential Gene Expression: Magnesium Sulfate for Neuralprotection'
 author: "Daniel Kristiyanto (danielkr@uw.edu), Troy Hasagen, Yingying Xia"
 date: "December 8, 2015"
 output:
-  pdf_document: 
-    highlight: espresso
-    number_sections: yes
   html_document:
     fig_caption: yes
     theme: flatly
+  pdf_document:
+    highlight: espresso
+    number_sections: yes
 ---
 ```{r, echo=FALSE, results="hide", warning=FALSE, include=FALSE, eval=TRUE}
 library("annotate")
